@@ -42,6 +42,11 @@ def calculate_probability_match(e1, e2):
     theta_ee = 0.75
     theta_l = 0.65
 
+    dct_out = {}
+    dct_out['probability'] = 0.0
+    dct_out[e1] = {}
+    dct_out[e2] = {}
+
     logger.info('Getting full candidate list from Dynamo')
     keys = get_all_keys()
     logger.info(f'There are {len(keys)} keys')
@@ -50,6 +55,11 @@ def calculate_probability_match(e1, e2):
     key_score_tuple_e1, key_score_tuple_e2 = get_largest_candidate_key(e1, e2, keys)
     logger.info(f'{e1} is mapped to key {key_score_tuple_e1[0]} with probability {key_score_tuple_e1[1]}')
     logger.info(f'{e2} is mapped to key {key_score_tuple_e2[0]} with probability {key_score_tuple_e2[1]}')
+
+    dct_out[e1]['key'] = key_score_tuple_e1[0]
+    dct_out[e2]['key'] = key_score_tuple_e2[0]
+    dct_out[e1]['key_probability'] = key_score_tuple_e1[1]
+    dct_out[e1]['key_probability'] = key_score_tuple_e2[1]
 
     if key_score_tuple_e1[0] == key_score_tuple_e2[0]:
         # matching key case (Case 2)
@@ -70,6 +80,11 @@ def calculate_probability_match(e1, e2):
             f' with probability {ticker_probability_tuple2[1]}')
         final_probability = min(key_score_tuple_e1[1] * ticker_probability_tuple2[1],
                   key_score_tuple_e2[1] * ticker_probability_tuple2[1])
+
+        dct_out[e1]['ticker'] = ticker_probability_tuple1[0]
+        dct_out[e2]['ticker'] = ticker_probability_tuple2[0]
+        dct_out[e1]['ticker_probability'] = ticker_probability_tuple1[1]
+        dct_out[e1]['ticker_probability'] = ticker_probability_tuple2[1]
 
         if ticker_probability_tuple1[0]==ticker_probability_tuple2[0]:
             # tickers match (Case 3)
@@ -93,4 +108,6 @@ def calculate_probability_match(e1, e2):
     else:
         logger.info(f'*****Match: Case {match} with probability is {final_probability}')
 
-    return match, final_probability
+    dct_out['probability'] = final_probability
+
+    return dct_out
