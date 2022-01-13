@@ -1,18 +1,13 @@
-import boto3
+
 import logging
-from botocore.exceptions import ClientError
-
-import os
-os.environ['AWS_PROFILE']='mike'
-assert os.getenv('AWS_PROFILE') == 'mike'
-
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 streamHandler = logging.StreamHandler()
 logger.addHandler(streamHandler)
 
-def start_table_session():
+def start_table_session_local():
+    import boto3
     session = boto3.Session()
     credentials = session.get_credentials()
     dynamodb = boto3.resource(
@@ -26,9 +21,17 @@ def start_table_session():
     return table
 
 
-def write_dct(dct):
+def start_table_session_lambda():
+    import boto3
+    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+    table = dynamodb.Table('Sp500EntityResolution')
 
-    table = start_table_session()
+    return table
+
+
+def write_dct(dct):
+    from botocore.exceptions import ClientError
+    table = start_table_session_local()
     logger.info('Retrieved Dynamo table')
     logger.info(f'Writing {len(dct)} items')
     for key, indexer in dct.items():
@@ -46,7 +49,7 @@ def write_dct(dct):
 
 
 def get_key_probability_and_name(key):
-    table = start_table_session()
+    table = start_table_session_lambda()
     response = table.get_item(Key={'candidates': key})
     response = response.get('Item', {})
     probability = float(response.get('probability', 0.0))
@@ -55,7 +58,7 @@ def get_key_probability_and_name(key):
 
 
 def get_all_keys():
-    table = start_table_session()
+    table = start_table_session_lambda()
     response = table.scan(AttributesToGet=['candidates'])
     response = response.get('Items', [])
     keys = [d['candidates'] for d in response]
