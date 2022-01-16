@@ -1,5 +1,6 @@
 from dynamo_utils import get_all_keys, get_key_probability_and_name
 from jellyfish import jaro_similarity
+from string_cleaning_utils import clean_org
 
 import logging
 
@@ -44,22 +45,30 @@ def calculate_probability_match(e1, e2):
 
     dct_out = {}
     dct_out['probability'] = 0.0
+    dct_out['match_case'] = None
     dct_out[e1] = {}
     dct_out[e2] = {}
+
+    e1_clean = clean_org(e1)
+    e2_clean = clean_org(e2)
 
     logger.info('Getting full candidate list from Dynamo')
     keys = get_all_keys()
     logger.info(f'There are {len(keys)} keys')
 
     # get k1, k2 (candidate synomous with key)
-    key_score_tuple_e1, key_score_tuple_e2 = get_largest_candidate_key(e1, e2, keys)
+    key_score_tuple_e1, key_score_tuple_e2 = get_largest_candidate_key(e1_clean, e2_clean, keys)
     logger.info(f'{e1} is mapped to key {key_score_tuple_e1[0]} with probability {key_score_tuple_e1[1]}')
     logger.info(f'{e2} is mapped to key {key_score_tuple_e2[0]} with probability {key_score_tuple_e2[1]}')
 
     dct_out[e1]['key'] = key_score_tuple_e1[0]
     dct_out[e2]['key'] = key_score_tuple_e2[0]
     dct_out[e1]['key_probability'] = key_score_tuple_e1[1]
-    dct_out[e1]['key_probability'] = key_score_tuple_e2[1]
+    dct_out[e2]['key_probability'] = key_score_tuple_e2[1]
+    dct_out[e1]['ticker'] = 'None'
+    dct_out[e2]['ticker'] = 'None'
+    dct_out[e1]['ticker_probability'] = 0
+    dct_out[e2]['ticker_probability'] = 0
 
     if key_score_tuple_e1[0] == key_score_tuple_e2[0]:
         # matching key case (Case 2)
@@ -84,7 +93,7 @@ def calculate_probability_match(e1, e2):
         dct_out[e1]['ticker'] = ticker_probability_tuple1[0]
         dct_out[e2]['ticker'] = ticker_probability_tuple2[0]
         dct_out[e1]['ticker_probability'] = ticker_probability_tuple1[1]
-        dct_out[e1]['ticker_probability'] = ticker_probability_tuple2[1]
+        dct_out[e2]['ticker_probability'] = ticker_probability_tuple2[1]
 
         if ticker_probability_tuple1[0]==ticker_probability_tuple2[0]:
             # tickers match (Case 3)
@@ -97,17 +106,18 @@ def calculate_probability_match(e1, e2):
 
     if match == 4:
         # override case: no match, but entities are very close to each other
-        prob_ee = calculate_probability_ee(e1, e2)
+        prob_ee = calculate_probability_ee(e1_clean, e2_clean)
         if prob_ee > theta_ee:
             match = 1
             final_probability = prob_ee
             logger.info(f'Case 1: Direct entity comparison overrider with probability {final_probability}')
 
-    if match==4:
+    if match == 4:
         logger.info(f'*****No Match: Case {match} with probability is {final_probability}')
     else:
         logger.info(f'*****Match: Case {match} with probability is {final_probability}')
 
     dct_out['probability'] = final_probability
+    dct_out['match_case'] = match
 
     return dct_out

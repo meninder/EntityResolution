@@ -1,6 +1,5 @@
 import logging
 import json
-from string_cleaning_utils import clean_org
 from matching_algo import calculate_probability_match
 
 logger = logging.getLogger(__name__)
@@ -11,23 +10,21 @@ logger.addHandler(streamHandler)
 
 def lambda_handler(event, context):
 
-    logging.info(f"Event Info: {event}")
-    logging.info(f"Context Info: {context}")
+    logger.info(f"Event Info: {event}")
+    logger.info(f"Context Info: {context}")
 
     q = event['queryStringParameters']
     e1 = q.get('e1', 'null1')
     e2 = q.get('e2', 'null2')
 
-    logging.info(f"entity1: {e1}")
-    logging.info(f"entity2: {e2}")
+    logger.info(f"entity1: {e1}")
+    logger.info(f"entity2: {e2}")
     logger.info(f'Checking if {e1} and {e2} match.')
 
-    e1_clean = clean_org(e1)
-    e2_clean = clean_org(e2)
-    dct = calculate_probability_match(e1_clean, e2_clean)
+    dct = calculate_probability_match(e1, e2)
 
     j = json.dumps(dct)
-    logging.info(f'json from calculation: {j}')
+    logger.info(f'json from calculation: {j}')
 
     return {
         'statusCode': 200,
