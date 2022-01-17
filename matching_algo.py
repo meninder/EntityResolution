@@ -65,7 +65,7 @@ def get_candidate_company_probability(candidate: str):
 
 # I would type all input in all function if not super painful
 # it really improves code a lot
-def calculate_probability_match(e1: str, e2: str, theta_ee: str = 0.75) -> PMatch:
+def calculate_probability_match(e1: str, e2: str, theta_ee: float = 0.75) -> PMatch:
     """
     
     Comments here, as in the main. Brief function description 
@@ -82,6 +82,11 @@ def calculate_probability_match(e1: str, e2: str, theta_ee: str = 0.75) -> PMatc
 
     # this is a call to a db, so probably should check for error
     keys = get_all_keys()
+    return  calculate_match_with_keys(e1, e2, keys, theta_ee)
+
+
+# def isolate the function so we can run it locally
+def calculate_match_with_keys(e1: str, e2: str, keys: list, theta_ee: float) -> PMatch:
     entities = [e1, e2]
     # get k1, k2 (candidate synomous with key)
     # probably terrible variable name
@@ -134,3 +139,5 @@ def calculate_probability_match(e1: str, e2: str, theta_ee: str = 0.75) -> PMatc
             source=source,
             target=target
             )
+
+    

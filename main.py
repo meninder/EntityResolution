@@ -1,6 +1,7 @@
 import logging
 import json
 from matching_algo import calculate_probability_match
+from matching_algo import calculate_match_with_keys
 
 
 # cool - I never used a logger in lambda since printing goes directly to CloudWatch (lazy me!)
@@ -55,3 +56,6 @@ def local_run():
 
 local_run()
 '''
+
+# run locally
+calculate_match_with_keys(e1='facebook', e2='meta', keys=['ciao'], theta_ee=0.75)
