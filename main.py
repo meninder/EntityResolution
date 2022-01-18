@@ -1,6 +1,6 @@
 import logging
 import json
-from matching_algo import calculate_probability_match
+from matching_algo import calculate_probability_match, get_all_keys
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -8,7 +8,13 @@ streamHandler = logging.StreamHandler()
 logger.addHandler(streamHandler)
 
 
-def lambda_handler(event, context):
+def lambda_api_endpoint(event, context):
+    """
+
+    This function takes in 2 query parameters called "e1" and "e2"
+    Return meta data based on the algo that describes the match.
+
+    """
 
     logger.info(f"Event Info: {event}")
     logger.info(f"Context Info: {context}")
@@ -21,9 +27,21 @@ def lambda_handler(event, context):
     logger.info(f"entity2: {e2}")
     logger.info(f'Checking if {e1} and {e2} match.')
 
-    dct = calculate_probability_match(e1, e2)
+    '''
+    if (e1=='null1') or (e2=='null2'):
+       j = json.dumps({})
+    else:
+        dct = calculate_probability_match(e1, e2)
+        j = json.dumps(dct)        
+    '''
 
+    logger.info('Getting full candidate list from Dynamo')
+    keys = get_all_keys()
+    logger.info(f'There are {len(keys)} keys')
+
+    dct = calculate_probability_match(e1, e2, keys)
     j = json.dumps(dct)
+
     logger.info(f'json from calculation: {j}')
 
     return {
@@ -38,10 +56,8 @@ def lambda_handler(event, context):
         'body': j
         }
 
-'''
-def local_run():
-    match, p_match = calculate_probability_match('bank of america', 'bofa')
-    return match, p_match
 
-local_run()
-'''
+def local_run():
+    calculate_probability_match(e1='facebook', e2='meta', keys=['ciao'], theta_ee=0.75)
+
+#local_run()

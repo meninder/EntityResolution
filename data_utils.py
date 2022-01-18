@@ -3,15 +3,15 @@ from collections import namedtuple
 
 
 # some named tuples here to improve readability
-ScoredKey = namedtuple('ScoredKey', 'key score')
-Ticker = namedtuple('Ticker', 'ticker probability')
-Entity = namedtuple('Entity', 'scores ticker')
-PMatch = namedtuple('PMatch', 'probability match_case source target')
+KeyScore = namedtuple('KeyScore', 'key score')
+CompanyScore = namedtuple('CompanyScore', 'company score')
+CandidateScore = namedtuple('CandidateScore', 'candidate key_score company_score')
+PMatch = namedtuple('PMatch', 'probability match_case candidate1_score, candidate2_score')
 
 
 # note, I put random key names ;-)
 class MatchType(Enum):
-    MAYBE = 1
-    PERFECT = 2
-    TICKER = 3
-    FOO = 4
+    FALLBACK = 1
+    KEYS_MATCH = 2
+    COMPANY_MATCH = 3
+    NON_MATCH = 4

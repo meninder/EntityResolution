@@ -20,12 +20,12 @@ provider:
 
 functions:
   entity_resolution:
-    handler: main.lambda_handler
+    handler: main.lambda_api_endpoint
     memorySize: 1024
     timeout: 15
     events:
       - http:
-          path: /lambda_handler
+          path: /lambda_api_endpoint
           method: get
           cors:
             origin: '*'

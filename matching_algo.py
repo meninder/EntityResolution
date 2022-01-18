@@ -1,9 +1,11 @@
 from dynamo_utils import get_all_keys, get_key_probability_and_name
 from jellyfish import jaro_similarity
 from string_cleaning_utils import clean_org
-
 import logging
+from data_utils import MatchType
+from data_utils import KeyScore, CompanyScore, CandidateScore, PMatch
 
+BLN_LOCAL_RUN = False
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -11,113 +13,99 @@ streamHandler = logging.StreamHandler()
 logger.addHandler(streamHandler)
 
 
-def calculate_probability_ee(e1, e2):
-    p_ee = jaro_similarity(e1, e2)
-    return p_ee
+def get_candidate_string_similarity_score(candidate1: str, candidate2: str) -> float:
+    """
+    Calculate similarity between candidate1 and 2.
+    Fall back matching logic relies on this similarity value (Case 1)
+    """
+
+    return jaro_similarity(candidate1, candidate2)
 
 
-def get_largest_candidate_key(e1, e2, keys):
-    scores_e1 = [(k, jaro_similarity(e1, k)) for k in keys]
-    scores_e1.sort(key=lambda x: x[1], reverse=True)
-    key_score_tuple_e1 = scores_e1[0]
+def get_candidate_key_score(candidate: str, keys: list) -> KeyScore:
+    '''
+    for each key, calculate similarity w candidate
+    '''
 
-    scores_e2 = [(k, jaro_similarity(e2, k)) for k in keys]
-    scores_e2.sort(key=lambda x: x[1], reverse=True)
-    key_score_tuple_e2 = scores_e2[0]
-
-    return key_score_tuple_e1, key_score_tuple_e2
-
-
-def get_candidate_company_probability(key_score_tuple_e1, key_score_tuple_e2):
-    key1, prob_ec1 = key_score_tuple_e1
-    key2, prob_ec2 = key_score_tuple_e2
-
-    ticker_probability_tuple1 = get_key_probability_and_name(key1)
-    ticker_probability_tuple2 = get_key_probability_and_name(key2)
-
-    return ticker_probability_tuple1, ticker_probability_tuple2
+    candidate_clean = clean_org(candidate)
+    scores = [(k, jaro_similarity(candidate_clean, k)) for k in keys]
+    scores.sort(key=lambda x: x[1], reverse=True)
+    highest_score = scores[0]
+    return KeyScore(key=highest_score[0], score=highest_score[1])
 
 
-def calculate_probability_match(e1, e2):
+def get_candidate_company_score(key: str) -> CompanyScore:
+    if BLN_LOCAL_RUN:
+        return CompanyScore(company='facebook', score=0.1)
+    else:
+        return get_key_probability_and_name(key)
 
-    theta_ee = 0.75
-    theta_l = 0.65
 
-    dct_out = {}
-    dct_out['probability'] = 0.0
-    dct_out['match_case'] = None
-    dct_out[e1] = {}
-    dct_out[e2] = {}
+def get_candidate_score(candidate: str, keys: list) -> CandidateScore:
+    '''
+    for a "candidate", finds "key" and "company", with corresponding scores.
+    '''
 
-    e1_clean = clean_org(e1)
-    e2_clean = clean_org(e2)
+    key_score = get_candidate_key_score(candidate, keys)
+    company_score = get_candidate_company_score(key_score[0])
 
-    logger.info('Getting full candidate list from Dynamo')
-    keys = get_all_keys()
-    logger.info(f'There are {len(keys)} keys')
+    return CandidateScore(candidate=candidate, key_score=key_score, company_score=company_score)
 
-    # get k1, k2 (candidate synomous with key)
-    key_score_tuple_e1, key_score_tuple_e2 = get_largest_candidate_key(e1_clean, e2_clean, keys)
-    logger.info(f'{e1} is mapped to key {key_score_tuple_e1[0]} with probability {key_score_tuple_e1[1]}')
-    logger.info(f'{e2} is mapped to key {key_score_tuple_e2[0]} with probability {key_score_tuple_e2[1]}')
 
-    dct_out[e1]['key'] = key_score_tuple_e1[0]
-    dct_out[e2]['key'] = key_score_tuple_e2[0]
-    dct_out[e1]['key_probability'] = key_score_tuple_e1[1]
-    dct_out[e2]['key_probability'] = key_score_tuple_e2[1]
-    dct_out[e1]['ticker'] = 'None'
-    dct_out[e2]['ticker'] = 'None'
-    dct_out[e1]['ticker_probability'] = 0
-    dct_out[e2]['ticker_probability'] = 0
+def calculate_probability_match(candidate1_score: CandidateScore,
+                                candidate2_score: CandidateScore,
+                                theta=0.75) -> PMatch:
 
-    if key_score_tuple_e1[0] == key_score_tuple_e2[0]:
-        # matching key case (Case 2)
-        final_probability = min(key_score_tuple_e1[1], key_score_tuple_e2[1])
-        match = 2
+    # find match case and final probability
+    if candidate1_score[1][0] == candidate2_score[1][0]:
+        final_probability = min(candidate1_score[1][1], candidate2_score[1][1])  # using key scores
+        match_case = MatchType.KEYS_MATCH
         logger.info(f'Case 2: Keys match with probability {final_probability}')
     else:
-        # get tickers corresponding to keys
-        ticker_probability_tuple1, ticker_probability_tuple2 = get_candidate_company_probability(key_score_tuple_e1,
-                                                                                                 key_score_tuple_e2)
-        logger.info(
-            f'Key {key_score_tuple_e1[0]}' + \
-            f' is mapped to {ticker_probability_tuple1[0]}' + \
-            f' with probability {ticker_probability_tuple1[1]}')
-        logger.info(
-            f'Key {key_score_tuple_e2[0]}' + \
-            f' is mapped to {ticker_probability_tuple2[0]}' + \
-            f' with probability {ticker_probability_tuple2[1]}')
-        final_probability = min(key_score_tuple_e1[1] * ticker_probability_tuple2[1],
-                  key_score_tuple_e2[1] * ticker_probability_tuple2[1])
-
-        dct_out[e1]['ticker'] = ticker_probability_tuple1[0]
-        dct_out[e2]['ticker'] = ticker_probability_tuple2[0]
-        dct_out[e1]['ticker_probability'] = ticker_probability_tuple1[1]
-        dct_out[e2]['ticker_probability'] = ticker_probability_tuple2[1]
-
-        if ticker_probability_tuple1[0]==ticker_probability_tuple2[0]:
-            # tickers match (Case 3)
-            match = 3
+        final_probability = min(candidate1_score[1][1] * candidate1_score[2][1],
+                                candidate2_score[1][1] * candidate1_score[2][1])
+        if candidate1_score[2][0] == candidate2_score[2][0]:  # using company, which match
+            match_case = MatchType.COMPANY_MATCH
             logger.info(f'Case 3: Keys do not match, but tickers match with probability {final_probability}')
-        else:
-            # tickers don't match (Case 4)
-            match = 4
-            logger.info(f'Case 4: Keys and tickers do not match with probability {final_probability}')
+        else:  # keys, company do not match, check candidate-candidate match
+            candidate_similarity_score = get_candidate_string_similarity_score(candidate1_score[0], candidate2_score[0])
+            if candidate_similarity_score > theta:  # override mismatch
+                match_case = MatchType.FALLBACK
+                final_probability = candidate_similarity_score
+                logger.info(f'Case 1: Direct entity comparison overrider with probability {final_probability}')
+            else:  # no match
+                match_case = MatchType.NON_MATCH
+                logger.info(f'Case 4: No Match with probability is {final_probability}')
 
-    if match == 4:
-        # override case: no match, but entities are very close to each other
-        prob_ee = calculate_probability_ee(e1_clean, e2_clean)
-        if prob_ee > theta_ee:
-            match = 1
-            final_probability = prob_ee
-            logger.info(f'Case 1: Direct entity comparison overrider with probability {final_probability}')
+    return PMatch(probability=final_probability,
+                  match_case=match_case,
+                  candidate1_score=candidate1_score,
+                  candidate2_score=candidate2_score)
 
-    if match == 4:
-        logger.info(f'*****No Match: Case {match} with probability is {final_probability}')
+
+def get_pmatch(candidate1: str, candidate2: str, keys: list) -> PMatch:
+    candidate1_score = get_candidate_score(candidate=candidate1, keys=keys)
+    logger.info(f'{candidate1_score[0]} is mapped to key {candidate1_score[1][0]} with probability {candidate1_score[1][1]}')
+    logger.info(f'{candidate1_score[0]} is mapped to company {candidate1_score[2][0]} with probability {candidate1_score[2][1]}')
+
+    candidate2_score = get_candidate_score(candidate=candidate2, keys=keys)
+    logger.info(f'{candidate2_score[0]} is mapped to key {candidate2_score[1][0]} with probability {candidate2_score[1][1]}')
+    logger.info(f'{candidate2_score[0]} is mapped to company {candidate2_score[2][0]} with probability {candidate2_score[2][1]}')
+
+    pmatch = calculate_probability_match(candidate1_score, candidate2_score)
+    logger.info(f'Ouput PMatch: {pmatch}')
+
+    return pmatch
+
+
+def main():
+    candidate1, candidate2 = 'facebook', 'fanebook' # Case 2
+    candidate1, candidate2 = 'facebook', 'bool'  # Case 3 (Local)
+    candidate1, candidate2 = 'facebook', 'bool'  # Case 4 (Non-Local)
+
+    if BLN_LOCAL_RUN:
+        lst_keys = ['faceboooook', 'face', 'book', 'test_case']
     else:
-        logger.info(f'*****Match: Case {match} with probability is {final_probability}')
+        lst_keys = get_all_keys()
 
-    dct_out['probability'] = final_probability
-    dct_out['match_case'] = match
-
-    return dct_out
+    get_pmatch(candidate1, candidate2, lst_keys)

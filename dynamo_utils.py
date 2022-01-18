@@ -1,5 +1,5 @@
-
 import logging
+from data_utils import CompanyScore
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -54,7 +54,7 @@ def get_key_probability_and_name(key):
     response = response.get('Item', {})
     probability = float(response.get('probability', 0.0))
     name = response.get('name', 'None')
-    return name, probability
+    return CompanyScore(company=name, score=probability)
 
 
 def get_all_keys():
