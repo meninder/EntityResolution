@@ -1,6 +1,7 @@
 import logging
 import json
-from matching_algo import calculate_probability_match, get_all_keys
+from matching_algo import get_all_keys, get_pmatch
+from data_utils import namedtuple_asdict
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -39,8 +40,8 @@ def lambda_api_endpoint(event, context):
     keys = get_all_keys()
     logger.info(f'There are {len(keys)} keys')
 
-    dct = calculate_probability_match(e1, e2, keys)
-    j = json.dumps(dct)
+    pmatch = get_pmatch(e1, e2, keys)
+    j = json.dumps(namedtuple_asdict(pmatch))
 
     logger.info(f'json from calculation: {j}')
 
@@ -58,6 +59,9 @@ def lambda_api_endpoint(event, context):
 
 
 def local_run():
-    calculate_probability_match(e1='facebook', e2='meta', keys=['ciao'], theta_ee=0.75)
+    get_pmatch(candidate1 = 'facebook',
+               candidate2 = 'fanebook',
+               keys=['faceboooook', 'face', 'book', 'test_case'],
+               theta=0.75)
 
 #local_run()
