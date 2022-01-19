@@ -28,22 +28,17 @@ def lambda_api_endpoint(event, context):
     logger.info(f"entity2: {e2}")
     logger.info(f'Checking if {e1} and {e2} match.')
 
-    '''
-    if (e1=='null1') or (e2=='null2'):
+    if (e1 == 'null1') or (len(e1) == 0) or (e2 == 'null2') or (len(e2) == 0):
        j = json.dumps({})
     else:
-        dct = calculate_probability_match(e1, e2)
-        j = json.dumps(dct)        
-    '''
+        logger.info('Getting full candidate list from Dynamo')
+        keys = get_all_keys()
+        logger.info(f'There are {len(keys)} keys')
 
-    logger.info('Getting full candidate list from Dynamo')
-    keys = get_all_keys()
-    logger.info(f'There are {len(keys)} keys')
+        pmatch = get_pmatch(e1, e2, keys)
+        j = json.dumps(namedtuple_asdict(pmatch))
 
-    pmatch = get_pmatch(e1, e2, keys)
-    j = json.dumps(namedtuple_asdict(pmatch))
-
-    logger.info(f'json from calculation: {j}')
+        logger.info(f'json from calculation: {j}')
 
     return {
         'statusCode': 200,

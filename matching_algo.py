@@ -35,6 +35,11 @@ def get_candidate_key_score(candidate: str, keys: list) -> KeyScore:
 
 
 def get_candidate_company_score(key: str) -> CompanyScore:
+    '''
+    Given a key, retrieve the value from Dynamo (non-local)
+    The value is converted to a CompanyScore type in the function
+    To debug, a local value is generated.
+    '''
     if BLN_LOCAL_RUN:
         return CompanyScore(company='facebook', score=0.1)
     else:
@@ -54,7 +59,16 @@ def get_candidate_score(candidate: str, keys: list) -> CandidateScore:
 
 def calculate_probability_match(candidate1_score: CandidateScore,
                                 candidate2_score: CandidateScore,
-                                theta: float=0.75) -> PMatch:
+                                theta: float = 0.75) -> PMatch:
+
+    '''
+    Takes the keys and companies for each candidate and then calculates the probability of a match.
+    There are four cases:
+    Case 1: Fallback method.  If candidate strings are close (>theta similarity) and all other matching checks fail.
+    Case 2: Keys match.  (c1=facebook, c2=fanebook will map to the same key; so don't need to look at company)
+    Case 3: Keys don't match, Companies do (c1=facebook, c2=meta platforms will have diff keys but map to meta platforms)
+    Case 4: Keys and company doesn't match.  Check if strings themselves are very close (Case 1) otherwise call No Match.
+    '''
 
     # find match case and final probability
     if candidate1_score[1][0] == candidate2_score[1][0]:
@@ -84,6 +98,10 @@ def calculate_probability_match(candidate1_score: CandidateScore,
 
 
 def get_pmatch(candidate1: str, candidate2: str, keys: list, theta: float=0.75) -> PMatch:
+    '''
+    Input the two candidates, get their key & company and resp scores, then calculate matching probability
+    '''
+
     candidate1_score = get_candidate_score(candidate=candidate1, keys=keys)
     logger.info(f'{candidate1_score[0]} is mapped to key {candidate1_score[1][0]} with probability {candidate1_score[1][1]}')
     logger.info(f'{candidate1_score[0]} is mapped to company {candidate1_score[2][0]} with probability {candidate1_score[2][1]}')
@@ -98,7 +116,7 @@ def get_pmatch(candidate1: str, candidate2: str, keys: list, theta: float=0.75) 
     return pmatch
 
 
-def main():
+def testing_function():
     candidate1, candidate2 = 'facebook', 'fanebook' # Case 2
     candidate1, candidate2 = 'facebook', 'bool'  # Case 3 (Local)
     candidate1, candidate2 = 'facebook', 'bool'  # Case 4 (Non-Local)
@@ -108,17 +126,27 @@ def main():
     else:
         lst_keys = get_all_keys()
 
-    get_pmatch(candidate1, candidate2, lst_keys, theta=0.75)
+    pmatch = get_pmatch(candidate1, candidate2, lst_keys, theta=0.75)
+
+    return pmatch
 
 
-def temp():
+def example_pmatch():
+    '''
+    Example PMatch data for debugging purposes
+    '''
+    key1_score = KeyScore(key='bank', score=1.0)
+    company1_score = CompanyScore(company='Bank of America', score=0.7555555555555555)
+    key2_score = KeyScore(key='bofa', score=1.0)
+    company2_score = CompanyScore(company='Bank of America', score=0.7555555555555555)
+
     pm = PMatch(probability=0.7555555555555555,
-           match_case= 3,
-           candidate1_score = CandidateScore(candidate='bank',
-                                                                                         key_score=KeyScore(key='bank',
-                                                                                                            score=1.0),
-                                                                                         company_score=CompanyScore(
-                                                                                             company='Bank of America',
-                                                                                             score=0.7555555555555555)), candidate2_score = CandidateScore(
-        candidate='bofa', key_score=KeyScore(key='bofa', score=1.0),
-        company_score=CompanyScore(company='Bank of America', score=0.6722222222222222)))
+                match_case=3,
+                candidate1_score=CandidateScore(candidate='bank',
+                                                key_score=key1_score,
+                                                company_score=company1_score),
+                candidate2_score=CandidateScore(candidate='bofa',
+                                                key_score=key2_score,
+                                                company_score=company2_score)
+                )
+    return pm
